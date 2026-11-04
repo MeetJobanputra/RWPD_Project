@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FocusOS — Your notes become the game</title>
+  <meta name="description" content="FocusOS turns your own notes and mind maps into a playable quiz game. Everything stays on your device.">
+  <meta name="theme-color" content="#0b0d1a">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icon-192.jpeg">
+
+  <!-- Bootstrap 5 (local copy, so the site works offline) -->
+  <link rel="stylesheet" href="assets/vendor/css/bootstrap.min.css">
+  <!-- FocusOS styles load after Bootstrap so they can override it -->
+  <link rel="stylesheet" href="assets/vendor/css/style.css">
+
+  <!-- Dashboard bento look. Every rule is scoped to the bento classes, so other pages are untouched -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&display=swap">
+  <style id="dashboard-bento-styles">
+    #page-dashboard {
+      --nq-violet: #7b4dff;
+      --nq-cyan: #19e3ff;
+      --nq-pink: #ff3d9a;
+      --nq-gold: #ffc53d;
+      --nq-tile: #14162e;
+      --nq-border: #2a2d5a;
+      --nq-text: #e8eaff;
+    }
+    #page-dashboard h1,
+    #page-dashboard .nq-number { font-family: "Chakra Petch", system-ui, sans-serif; letter-spacing: 0.01em; }
+    .nq-greeting { margin-bottom: 1rem; }
+
+    .nq-bento {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-auto-rows: minmax(150px, auto);
+      grid-auto-flow: dense;
+      gap: 1rem;
+    }
+
+    .nq-tile {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      padding: 1.25rem;
+      color: var(--nq-text);
+      background: var(--nq-tile);
+      border: 1px solid var(--nq-border);
+      border-radius: 0.5rem;
+    }
+
+    /* small HUD corner bracket on every tile */
+    .nq-tile::before {
+      content: "";
+      position: absolute;
+      top: -1px;
+      left: -1px;
+      width: 16px;
+      height: 16px;
+      border-top: 2px solid var(--nq-cyan);
+      border-left: 2px solid var(--nq-cyan);
+      border-top-left-radius: 0.5rem;
+      pointer-events: none;
+    }
+
+    .nq-label { margin-bottom: 0.5rem; font-size: 0.9rem; opacity: 0.75; }
+    .nq-number { margin-top: auto; font-size: 3rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+    .nq-tile small { opacity: 0.85; }
+    .nq-tile a { color: var(--nq-cyan); text-decoration: none; }
+    .nq-tile a:hover { text-decoration: underline; }
+
+    /* tile sizes */
+    .nq-quest, .nq-recent { grid-column: span 2; grid-row: span 2; }
+    .nq-wide { grid-column: span 2; }
+    .nq-full { grid-column: 1 / -1; }
+
+    /* the daily quest tile is the glowing one */
+    .nq-quest {
+      color: #fff;
+      background: var(--nq-violet);
+      border-color: var(--nq-cyan);
+      box-shadow: 0 0 0 1px rgba(25, 227, 255, 0.4), 0 0 28px rgba(25, 227, 255, 0.3);
+    }
+    .nq-quest .nq-number { font-size: 6rem; }
+
+    .nq-streak { border-color: var(--nq-pink); }
+    .nq-streak .nq-number { color: #ff5fae; }
+    .nq-level { border-color: var(--nq-gold); }
+    .nq-level .nq-number { color: var(--nq-gold); }
+    .nq-quizzes .nq-number { color: var(--nq-cyan); }
+
+    .nq-progress { height: 16px; margin: 1rem 0; overflow: hidden; background: rgba(255, 255, 255, 0.2); border-radius: 16px; }
+    .nq-progress-bar { width: 0; height: 100%; background: var(--nq-cyan); border-radius: 16px; transition: width 0.4s; }
+    .nq-level .nq-progress { height: 8px; margin: 0.5rem 0 0; background: rgba(255, 197, 61, 0.2); }
+    .nq-level .nq-progress-bar { background: var(--nq-gold); }
+
+    .nq-gold-btn { padding: 0.5rem 1rem; color: #1a1400; font-weight: 600; background: var(--nq-gold); border: 0; border-radius: 0.5rem; }
+    .nq-gold-btn:hover { background: #ffd466; }
+
+    @media (prefers-reduced-motion: reduce) { .nq-progress-bar { transition: none; } }
+    @media (max-width: 991.98px) { .nq-bento { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 575.98px) {
+      .nq-bento { grid-template-columns: 1fr; }
+      .nq-quest, .nq-recent, .nq-wide { grid-column: span 1; grid-row: span 1; }
+      .nq-quest .nq-number { font-size: 4.5rem; }
+    }
+  </style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<div class="app-shell">
+
+  <!-- ============ SIDEBAR (shared navigation) ============ -->
+  <aside id="sidebar" class="sidebar" aria-label="Main navigation">
+    <div class="brand">
+      <img src="assets/icon.svg" alt="" width="36" height="36">
+      <div>
+        <div class="brand-name">FocusOS</div>
+        <div class="brand-tag">Your notes become the game</div>
+      </div>
+    </div>
+
+    <nav class="nav-list">
+      <a href="#/dashboard"   data-route="dashboard"><span class="nav-ico" aria-hidden="true">🏠</span>Dashboard</a>
+      <a href="#/notes"       data-route="notes"><span class="nav-ico" aria-hidden="true">📝</span>My Notes</a>
+      <a href="#/draw"        data-route="draw"><span class="nav-ico" aria-hidden="true">🎨</span>Drawing Board</a>
+      <a href="#/mindmaps"    data-route="mindmaps"><span class="nav-ico" aria-hidden="true">🧠</span>Mind Maps</a>
+      <a href="#/arena"       data-route="arena"><span class="nav-ico" aria-hidden="true">⚔️</span>Arena Mode</a>
+      <a href="#/leaderboard" data-route="leaderboard"><span class="nav-ico" aria-hidden="true">🏆</span>Leaderboard</a>
+      <a href="#/settings"    data-route="settings"><span class="nav-ico" aria-hidden="true">⚙️</span>Settings &amp; Backup</a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div>🔒 Saved on this device only</div>
+      <div id="sw-status" class="muted small">Offline mode: checking…</div>
+    </div>
+  </aside>
+  <div id="backdrop" class="backdrop"></div>
+
+  <div class="main-col">
+    <!-- Mobile top bar -->
+    <header class="topbar">
+      <button id="menu-btn" class="btn-fx ghost" aria-label="Open menu" aria-controls="sidebar">☰</button>
+      <strong>FocusOS</strong>
+    </header>
+
+    <main id="main" tabindex="-1">
+
+      <!-- ============ 1. DASHBOARD ============ -->
+      <section id="page-dashboard" class="page" data-title="Dashboard">
+        <div class="nq-greeting">
+          <h1 id="dash-welcome">Welcome back</h1>
+          <p id="dash-date" class="muted mb-0"></p>
+        </div>
+
+        <div class="nq-bento" id="dash-stats">
+
+          <div class="nq-tile nq-quest">
+            <div class="nq-label">Daily quest: finish 3 quizzes</div>
+            <div class="nq-number"><span id="nq-quest-done">0</span>/3</div>
+            <div class="nq-progress"><div class="nq-progress-bar" id="nq-quest-bar"></div></div>
+            <div><button class="nq-gold-btn" data-go="arena">Start Arena Mode</button></div>
+          </div>
+
+          <div class="nq-tile nq-streak">
+            <div class="nq-label">Streak</div>
+            <div class="nq-number" id="nq-streak">0</div>
+            <small>days in a row</small>
+          </div>
+
+          <div class="nq-tile nq-level">
+            <div class="nq-label">Level</div>
+            <div class="nq-number" id="nq-level">1</div>
+            <div class="nq-progress"><div class="nq-progress-bar" id="nq-xp-bar"></div></div>
+          </div>
+
+          <div class="nq-tile nq-quizzes">
+            <div class="nq-label">Quizzes completed</div>
+            <div class="nq-number" id="stat-quizzes">0</div>
+            <small>Best score: <span id="stat-best">—</span></small>
+          </div>
+
+          <div class="nq-tile">
+            <div class="nq-label">Notes created</div>
+            <div class="nq-number" id="stat-notes">0</div>
+            <small><span id="stat-maps">0</span> mind maps created</small>
+          </div>
+
+          <div class="nq-tile nq-recent">
+            <div class="nq-label">Recently edited notes</div>
+            <div id="dash-recent-notes"></div>
+          </div>
+
+          <div class="nq-tile nq-wide">
+            <div class="nq-label">Recently played quizzes</div>
+            <div id="dash-recent-quizzes"></div>
+          </div>
+
+          <div class="nq-tile nq-wide">
+            <div class="nq-label">How it works</div>
+            <ol class="mb-0 ps-3">
+              <li>Write notes or build a mind map</li>
+              <li>Add your own question-and-answer pairs</li>
+              <li>Play Arena Mode to earn points and level up</li>
+            </ol>
+          </div>
+
+          <div class="nq-tile nq-full">
+            <div class="nq-label">Quick actions</div>
+            <div class="quick-actions">
+              <button class="btn-fx" data-go="notes" data-action="new-note">📝 Create note</button>
+              <button class="btn-fx" data-go="draw">🎨 Draw</button>
+              <button class="btn-fx" data-go="mindmaps" data-action="new-map">🧠 Mind map</button>
+              <button class="btn-fx primary" data-go="arena">⚔️ Arena Mode</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ============ 2. NOTES ============ -->
+      <section id="page-notes" class="page" data-title="My Notes">
+        <div class="page-head">
+          <h1>My Notes</h1>
+          <div class="d-flex gap-2 flex-wrap">
+            <button id="note-export-all" class="btn-fx ghost">Export all notes</button>
+            <button id="note-new" class="btn-fx primary">+ New note</button>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-lg-4">
+            <div class="card-fx">
+              <label class="visually-hidden" for="note-search">Search notes</label>
+              <input id="note-search" class="input" type="search" placeholder="Search title, text, tags…">
+              <label class="visually-hidden" for="note-filter">Filter by subject</label>
+              <select id="note-filter" class="input mt-2"></select>
+              <div id="note-list" class="note-list mt-3"></div>
+            </div>
+          </div>
+
+          <div class="col-lg-8">
+            <div class="card-fx">
+              <div id="note-empty" class="empty">
+                <p>Select a note on the left, or create a new one.</p>
+                <button class="btn-fx primary" id="note-empty-new">+ New note</button>
+              </div>
+
+              <div id="note-form" hidden>
+                <label class="field-label" for="note-title">Title</label>
+                <input id="note-title" class="input input-title" maxlength="120" placeholder="Note title">
+
+                <div class="row g-3 mt-0">
+                  <div class="col-md-6">
+                    <label class="field-label" for="note-subject">Subject</label>
+                    <input id="note-subject" class="input" maxlength="40" list="subject-options" placeholder="e.g. Biology">
+                    <datalist id="subject-options"></datalist>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="field-label" for="note-tags">Tags (comma separated)</label>
+                    <input id="note-tags" class="input" maxlength="120" placeholder="exam, chapter 3">
+                  </div>
+                </div>
+
+                <label class="field-label mt-3" for="note-content">Note</label>
+                <textarea id="note-content" class="input note-body" rows="14" placeholder="Write your notes here…"></textarea>
+
+                <div class="editor-foot">
+                  <span id="note-status" class="save-status" role="status" aria-live="polite"></span>
+                  <div class="d-flex gap-2">
+                    <button id="note-export" class="btn-fx ghost">Export as .txt</button>
+                    <button id="note-delete" class="btn-fx danger">Delete</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 3. DRAWING BOARD ============ -->
+      <section id="page-draw" class="page" data-title="Drawing Board">
+        <div class="page-head"><h1>Drawing Board</h1></div>
+
+        <div class="card-fx mb-3">
+          <div class="toolbar">
+            <div class="tool-group" role="group" aria-label="Tools">
+              <button id="tool-pen" class="btn-fx active" aria-pressed="true">✏️ Pen</button>
+              <button id="tool-eraser" class="btn-fx" aria-pressed="false">🧽 Eraser</button>
+            </div>
+            <label class="tool-field">Color
+              <input id="draw-color" type="color" value="#22d3ee">
+            </label>
+            <label class="tool-field">Size
+              <input id="draw-size" type="range" min="1" max="60" value="6">
+              <span id="draw-size-label" class="muted small">6px</span>
+            </label>
+            <div class="tool-group">
+              <button id="draw-undo" class="btn-fx">↶ Undo</button>
+              <button id="draw-clear" class="btn-fx">Clear</button>
+            </div>
+          </div>
+          <div class="toolbar mt-2">
+            <input id="draw-name" class="input input-sm" maxlength="40" placeholder="Drawing name" aria-label="Drawing name">
+            <button id="draw-save" class="btn-fx primary">💾 Save</button>
+            <button id="draw-download" class="btn-fx ghost">Download PNG</button>
+            <button id="draw-new" class="btn-fx ghost">New board</button>
+          </div>
+        </div>
+
+        <div class="canvas-wrap"><canvas id="draw-canvas" width="960" height="540" aria-label="Drawing canvas"></canvas></div>
+
+        <h2 class="section-title mt-4">Saved drawings</h2>
+        <div id="draw-gallery" class="gallery"></div>
+      </section>
+
+      <!-- ============ 4. MIND MAPS ============ -->
+      <section id="page-mindmaps" class="page" data-title="Mind Maps">
+        <div class="page-head">
+          <h1>Mind Maps</h1>
+          <button id="mm-new" class="btn-fx primary">+ New mind map</button>
+        </div>
+
+        <div id="mm-empty" class="card-fx empty" hidden>
+          <p>You have no mind maps yet. Create one, then turn it into a quiz in Arena Mode.</p>
+          <button id="mm-empty-new" class="btn-fx primary">+ New mind map</button>
+        </div>
+
+        <div id="mm-workspace" hidden>
+          <div class="card-fx mb-3">
+            <div class="toolbar">
+              <label class="visually-hidden" for="mm-select">Choose mind map</label>
+              <select id="mm-select" class="input input-sm"></select>
+              <input id="mm-name" class="input input-sm" maxlength="60" placeholder="Map name" aria-label="Map name">
+              <button id="mm-save" class="btn-fx">💾 Save</button>
+              <button id="mm-delete-map" class="btn-fx danger">Delete map</button>
+              <span id="mm-status" class="save-status ms-auto" role="status" aria-live="polite"></span>
+            </div>
+            <div class="toolbar mt-2">
+              <button id="mm-add" class="btn-fx primary">+ Add sub-topic</button>
+              <button id="mm-delete-node" class="btn-fx danger">Delete topic</button>
+              <span class="tool-sep"></span>
+              <button id="mm-zoom-out" class="btn-fx" aria-label="Zoom out">−</button>
+              <span id="mm-zoom-label" class="muted small zoom-label">100%</span>
+              <button id="mm-zoom-in" class="btn-fx" aria-label="Zoom in">+</button>
+              <button id="mm-reset-view" class="btn-fx ghost">Reset view</button>
+              <button id="mm-quiz" class="btn-fx battle ms-auto">⚔️ Start Quiz Battle</button>
+            </div>
+          </div>
+
+          <div class="mm-wrap">
+            <svg id="mm-svg" class="mm-svg" role="application" aria-label="Mind map editor. Drag topics to move them; drag the background to pan.">
+              <g id="mm-world"></g>
+            </svg>
+            <div class="mm-hint muted small">Click a topic to select it · drag topics to move · drag the background to pan · scroll to zoom · double-click to edit</div>
+          </div>
+
+          <div class="row g-3 mt-1">
+            <div class="col-lg-5">
+              <div class="card-fx h-100">
+                <h2 class="section-title">Selected topic</h2>
+                <label class="field-label" for="mm-node-text">Topic name</label>
+                <input id="mm-node-text" class="input" maxlength="60">
+                <label class="field-label mt-3" for="mm-node-info">Extra info (optional)</label>
+                <textarea id="mm-node-info" class="input" rows="3" maxlength="300" placeholder="A fact or definition about this topic. Arena Mode uses it to ask “Which topic matches this description?”"></textarea>
+                <button id="mm-node-save" class="btn-fx primary mt-3">Update topic</button>
+              </div>
+            </div>
+
+            <div class="col-lg-7">
+              <div class="card-fx h-100">
+                <h2 class="section-title">Extra quiz questions</h2>
+                <p class="muted small">Add your own question-and-answer pairs. Arena Mode only uses what you save here and in the map, so nothing is made up.</p>
+                <div id="qa-list" class="qa-list"></div>
+
+                <div class="qa-form">
+                  <label class="field-label" for="qa-question">Question</label>
+                  <input id="qa-question" class="input" maxlength="200">
+                  <label class="field-label mt-2" for="qa-answer">Correct answer</label>
+                  <input id="qa-answer" class="input" maxlength="100">
+                  <div class="field-label mt-2">Wrong answers (optional, up to 3)</div>
+                  <div class="row g-2">
+                    <div class="col-md-4"><input id="qa-wrong-0" class="input" maxlength="100" aria-label="Wrong answer 1"></div>
+                    <div class="col-md-4"><input id="qa-wrong-1" class="input" maxlength="100" aria-label="Wrong answer 2"></div>
+                    <div class="col-md-4"><input id="qa-wrong-2" class="input" maxlength="100" aria-label="Wrong answer 3"></div>
+                  </div>
+                  <div class="d-flex gap-2 mt-3">
+                    <button id="qa-save" class="btn-fx primary">Add question</button>
+                    <button id="qa-cancel" class="btn-fx ghost" hidden>Cancel edit</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 5. ARENA MODE ============ -->
+      <section id="page-arena" class="page" data-title="Arena Mode">
+
+        <!-- 5a. Setup -->
+        <div id="arena-setup">
+          <div class="page-head"><h1>Arena Mode</h1></div>
+
+          <div id="arena-no-maps" class="card-fx empty" hidden>
+            <p>Arena Mode turns a mind map into a quiz. Create a mind map first.</p>
+            <button class="btn-fx primary" data-go="mindmaps" data-action="new-map">🧠 Create a mind map</button>
+          </div>
+
+          <div id="arena-form" class="row g-3" hidden>
+            <div class="col-lg-7">
+              <div class="card-fx h-100">
+                <label class="field-label" for="arena-map">Mind map</label>
+                <select id="arena-map" class="input"></select>
+                <p id="arena-available" class="muted small mt-2"></p>
+                <p class="small"><a href="#/mindmaps">Add more topics or custom questions in Mind Maps</a></p>
+
+                <div class="field-label mt-3">Mode</div>
+                <div class="seg" role="radiogroup" aria-label="Game mode">
+                  <label><input type="radio" name="arena-mode" value="solo" checked><span>Solo run</span></label>
+                  <label><input type="radio" name="arena-mode" value="duel"><span>Two-player duel</span></label>
+                </div>
+                <p id="arena-duel-hint" class="muted small mt-2" hidden>Players share one keyboard and take turns. Player 1 answers with A S D F, Player 2 with J K L ;. You can also click or tap the answers.</p>
+
+                <div class="row g-3 mt-0">
+                  <div class="col-md-6">
+                    <label class="field-label" for="arena-difficulty">Difficulty</label>
+                    <select id="arena-difficulty" class="input">
+                      <option value="easy">Easy — 20 s per question</option>
+                      <option value="normal">Normal — 15 s per question</option>
+                      <option value="hard">Hard — 8 s, 1.5× points</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="field-label" for="arena-count">Number of questions</label>
+                    <input id="arena-count" class="input" type="number" min="1" value="10">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="field-label" for="arena-p1">Player 1 name</label>
+                    <input id="arena-p1" class="input" maxlength="20">
+                  </div>
+                  <div class="col-md-6" id="arena-p2-wrap" hidden>
+                    <label class="field-label" for="arena-p2">Player 2 name</label>
+                    <input id="arena-p2" class="input" maxlength="20" value="Player 2">
+                  </div>
+                </div>
+
+                <button id="arena-start" class="btn-fx battle btn-lg mt-4">⚔️ Start battle</button>
+              </div>
+            </div>
+            <div class="col-lg-5">
+              <div class="card-fx h-100">
+                <h2 class="section-title">How scoring works</h2>
+                <ul class="plain-list">
+                  <li>Each correct answer earns 100 points.</li>
+                  <li>Answer faster to earn up to 50 bonus points.</li>
+                  <li>Hard difficulty multiplies points by 1.5.</li>
+                  <li>Questions come only from your mind map topics, their descriptions and your own question-and-answer pairs.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5b. Game -->
+        <div id="arena-game" hidden>
+          <div class="game-top">
+            <div class="scoreboard" id="game-scoreboard"></div>
+            <div class="game-progress">
+              <span id="game-progress-text">Question 1 of 10</span>
+              <div class="progress-track"><div id="game-progress-bar" class="progress-fill"></div></div>
+            </div>
+          </div>
+
+          <div class="timer-row">
+            <div class="timer-track"><div id="game-timer-bar" class="timer-fill"></div></div>
+            <span id="game-timer-text" class="timer-text">15</span>
+          </div>
+
+          <div class="question-card">
+            <div id="game-turn" class="turn-banner" hidden></div>
+            <p id="game-question" class="question-text"></p>
+            <div id="game-options" class="options"></div>
+            <div id="game-feedback" class="feedback" role="status" aria-live="polite"></div>
+            <div class="game-actions">
+              <button id="game-quit" class="btn-fx ghost">Quit</button>
+              <button id="game-next" class="btn-fx primary" hidden>Next</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5c. Results -->
+        <div id="arena-results" hidden>
+          <div class="results-card">
+            <div id="results-headline" class="results-headline"></div>
+            <div id="results-sub" class="muted"></div>
+            <div id="results-stats" class="results-stats"></div>
+            <div id="results-note" class="muted small"></div>
+            <div class="results-actions">
+              <button id="results-again" class="btn-fx battle">Play again</button>
+              <button id="results-setup" class="btn-fx">Change settings</button>
+              <button id="results-dashboard" class="btn-fx ghost" data-go="dashboard">Return to dashboard</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 6. LEADERBOARD ============ -->
+      <section id="page-leaderboard" class="page" data-title="Leaderboard">
+        <div class="page-head">
+          <h1>Leaderboard</h1>
+          <button id="lb-reset" class="btn-fx danger">Reset leaderboard</button>
+        </div>
+        <div class="notice">This leaderboard is stored on <strong>this device and browser only</strong>. It is not a global online leaderboard, and other devices will not see these scores.</div>
+
+        <div class="card-fx mb-3">
+          <h2 class="section-title">Top players</h2>
+          <div id="lb-players"></div>
+        </div>
+        <div class="card-fx">
+          <h2 class="section-title">Recent results</h2>
+          <div id="lb-recent"></div>
+        </div>
+      </section>
+
+      <!-- ============ 7. SETTINGS ============ -->
+      <section id="page-settings" class="page" data-title="Settings &amp; Backup">
+        <div class="page-head"><h1>Settings &amp; Backup</h1></div>
+        <div class="row g-3">
+          <div class="col-lg-6">
+            <div class="card-fx h-100">
+              <h2 class="section-title">Preferences</h2>
+              <label class="field-label" for="set-name">Your player name</label>
+              <input id="set-name" class="input" maxlength="20">
+              <label class="field-label mt-3" for="set-difficulty">Default difficulty</label>
+              <select id="set-difficulty" class="input">
+                <option value="easy">Easy</option>
+                <option value="normal">Normal</option>
+                <option value="hard">Hard</option>
+              </select>
+              <label class="check mt-3"><input type="checkbox" id="set-sound"> Play sound effects in Arena Mode</label>
+              <button id="set-save" class="btn-fx primary mt-3">Save preferences</button>
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <div class="card-fx h-100">
+              <h2 class="section-title">Back up and restore</h2>
+              <p class="muted small">Your data lives in this browser. Download a backup file now and then, especially before clearing browser data.</p>
+              <div class="d-flex gap-2 flex-wrap">
+                <button id="set-export" class="btn-fx primary">Download backup</button>
+                <button id="set-import-btn" class="btn-fx">Restore from backup…</button>
+                <input id="set-import" type="file" accept="application/json,.json" hidden>
+              </div>
+              <p id="set-usage" class="muted small mt-3"></p>
+            </div>
+          </div>
+
+          <div class="col-12">
+            <div class="card-fx">
+              <h2 class="section-title">Privacy and danger zone</h2>
+              <p class="muted small">FocusOS has no account and no server. Nothing you write, draw or score is sent anywhere.</p>
+              <button id="set-reset" class="btn-fx danger">Delete all FocusOS data</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<!-- Shared dialog used for confirmations and short prompts -->
+<dialog id="dlg" class="dlg"></dialog>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+
+<!-- Scripts: plain files, no build step. Order matters (shared helpers first). -->
+<script src="js/storage.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/quiz.js"></script>
+<script src="js/notes.js"></script>
+<script src="js/draw.js"></script>
+<script src="js/mindmap.js"></script>
+<script src="js/arena.js"></script>
+<script src="js/leaderboard.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/app.js"></script>
+
+<!-- Dashboard game layer: streak, level and daily quest.
+     It watches the "Quizzes completed" number the dashboard already shows,
+     so no other FocusOS file is touched. -->
+<script>
+(function () {
+  const STORAGE_KEY = 'focusos.dashboard';
+  const QUEST_TARGET = 3;
+  const XP_PER_QUIZ = 50;
+  const XP_PER_LEVEL = 100;
+
+  const quizCounter = document.getElementById('stat-quizzes');
+  let state = { xp: 0, streak: 0, lastDay: '', questDay: '', questDone: 0, seenQuizzes: null };
+
+  try {
+    state = Object.assign(state, JSON.parse(localStorage.getItem(STORAGE_KEY)) || {});
+  } catch (error) {
+    /* no saved state yet, or storage is blocked */
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {
+      /* storage full or blocked: the tiles still work for this visit */
+    }
+  }
+
+  // Local date as YYYY-MM-DD ("en-CA" formats dates that way)
+  function dayString(daysAgo) {
+    const date = new Date();
+    date.setDate(date.getDate() - (daysAgo || 0));
+    return date.toLocaleDateString('en-CA');
+  }
+
+  function setText(id, value) {
+    document.getElementById(id).textContent = value;
+  }
+
+  function render() {
+    const today = dayString(0);
+    const streakIsAlive = state.lastDay === today || state.lastDay === dayString(1);
+    const questDone = state.questDay === today ? Math.min(state.questDone, QUEST_TARGET) : 0;
+
+    setText('nq-streak', streakIsAlive ? state.streak : 0);
+    setText('nq-level', Math.floor(state.xp / XP_PER_LEVEL) + 1);
+    setText('nq-quest-done', questDone);
+    document.getElementById('nq-xp-bar').style.width = (state.xp % XP_PER_LEVEL) + '%';
+    document.getElementById('nq-quest-bar').style.width = (questDone / QUEST_TARGET) * 100 + '%';
+  }
+
+  function onQuizCountChange() {
+    const count = parseInt(quizCounter.textContent, 10);
+    if (isNaN(count)) return;
+
+    const newQuizzes = count - state.seenQuizzes;
+    state.seenQuizzes = count;
+
+    if (newQuizzes > 0) {
+      const today = dayString(0);
+
+      if (state.lastDay !== today) {
+        state.streak = state.lastDay === dayString(1) ? state.streak + 1 : 1;
+        state.lastDay = today;
+      }
+      if (state.questDay !== today) {
+        state.questDay = today;
+        state.questDone = 0;
+      }
+      state.questDone += newQuizzes;
+      state.xp += newQuizzes * XP_PER_QUIZ;
+    }
+
+    saveState();
+    render();
+  }
+
+  // Wait until the page has loaded so the dashboard script has filled in the real quiz count first
+  window.addEventListener('load', function () {
+    if (state.seenQuizzes === null) {
+      // first visit: give XP for quizzes already played (their dates are unknown, so no streak)
+      const existing = parseInt(quizCounter.textContent, 10) || 0;
+      state.seenQuizzes = existing;
+      state.xp = existing * XP_PER_QUIZ;
+      saveState();
+    }
+    render();
+
+    new MutationObserver(onQuizCountChange).observe(quizCounter, { childList: true, characterData: true, subtree: true });
+    window.addEventListener('hashchange', render); // refreshes the daily quest after midnight
+  });
+})();
+</script>
+</body>
+</html>
